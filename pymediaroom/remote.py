@@ -1,6 +1,7 @@
 """Remote control agent for Mediaroom Set up Boxes (STB)."""
 import logging
 import asyncio
+import re
 from enum import Enum
 from async_timeout import timeout
 
@@ -48,6 +49,16 @@ class Remote():
         """Return the channel name. TODO: implement remote webservice to resolv tune_src"""
         self.tune_src = tune_src
         return self.current_channel
+
+    def parsechan(self, src):
+        chregexp = re.compile('udp://(\d+\.){3}\d+:\d+:([a-zA-Z0-9]+-){4}[a-zA-Z0-9]+\?.*&ch=(?P<chan>\d+)&?.*')
+        m = chregexp.match(src)
+        ch = None
+        if m:
+            ch = m.group('chan')
+        else:
+            _LOGGER.debug("Regexp didn't match channel in: %s", src)
+        return ch
 
     def __repr__(self):
         return self.stb_ip
@@ -120,8 +131,13 @@ class Remote():
             self._state = State.PLAYING_LIVE_TV 
             self.tune_src = notify.tune['@src']
             try:
+                self.current_channel = self.parsechan(notify.recreq['@src'])
+            except TypeError:
+                _LOGGER.debug("No recreq['src'] received in current message: %s", notify)
+            try:
                 if notify.stopped:
                     self._state = State.STOPPED
+                    self._channel = None
                 elif notify.timeshift:
                     self._state = State.PLAYING_TIMESHIFT_TV
                 elif notify.recorded:
@@ -130,9 +146,11 @@ class Remote():
                 _LOGGER.debug("%s please report at https://github.com/dgomes/pymediaroom/issues", e)
         else:
             self._state = State.STANDBY
-        
-        _LOGGER.debug("%s is %s", self.stb_ip, self._state)
-        return self._state
+            self._channel = None
+        attrs = dict()
+        attrs['channel'] = self.current_channel
+        _LOGGER.debug("%s is %s (ch=%s)", self.stb_ip, self._state, self.current_channel)
+        return self._state, attrs
 
 async def discover(ignore_list=[], max_wait=30, loop=None):
     """List STB in the network."""

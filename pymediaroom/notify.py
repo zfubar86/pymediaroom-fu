@@ -54,7 +54,7 @@ class MediaroomNotify(object):
 #        _LOGGER.debug("x-lastUserActivity: %s", self._last_user_activity)
 #        _LOGGER.debug("x-device: %s", self._device)
 
-        return "NOTIFY from {} - {}".format(self.src_ip, self.tune)
+        return "NOTIFY from {} - {} - {}".format(self.src_ip, self.tune, self.recreq)
 
     @property
     def tune(self):
@@ -67,6 +67,19 @@ class MediaroomNotify(object):
                 return tune[0]
             return tune
         return None
+
+    @property
+    def recreq(self):
+        """XML node representing tune."""
+        if self._node.get('activities'):
+            recreq = self._node['activities'].get('recreq')
+            if type(recreq) is collections.OrderedDict:
+                return recreq
+            elif type(recreq) is list:
+                return recreq[0]
+            return recreq 
+        return None
+
 
     @property
     def stopped(self):
@@ -121,8 +134,10 @@ def create_socket():
 
     # IGMP packet
     group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
-    mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
+    #mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
+    mreq = socket.inet_aton(MEDIAROOM_BROADCAST_ADDR) + socket.inet_aton("192.168.1.40")
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton("192.168.1.40"))
 
     sock.bind(('', MEDIAROOM_BROADCAST_PORT))
 
@@ -139,6 +154,7 @@ class MediaroomProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         """Setup transport."""
         self.transport = transport
+        _LOGGER.debug("Connection made")
 
     def connection_lost(self, exception):
         """Connection is lost."""
@@ -149,7 +165,7 @@ class MediaroomProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         """Datagram received callback."""
-        #_LOGGER.debug(data)
+        _LOGGER.debug(data)
         if not self.box_ip or self.box_ip == addr[0]:
             self.responses(MediaroomNotify(addr, data))
 
@@ -178,6 +194,7 @@ async def install_mediaroom_protocol(responses_callback, box_ip=None):
 
     sock = create_socket()
 
-    await loop.create_datagram_endpoint(lambda: mediaroom_protocol, sock=sock)
+    connect = loop.create_datagram_endpoint(lambda: mediaroom_protocol, sock=sock)
+    transport, protocol = await loop.create_task(connect)
 
     return mediaroom_protocol
