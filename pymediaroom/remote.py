@@ -11,7 +11,7 @@ from .error import PyMediaroomError
 
 _LOGGER = logging.getLogger(__name__)
 
-REMOTE_CONTROL_PORT = 8082
+REMOTE_CONTROL_PORT = 8086
 
 GET_STATE_TIMEOUT = 10
 OPEN_CONTROL_TIMEOUT = 5
