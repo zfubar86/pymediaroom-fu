@@ -117,7 +117,7 @@ class MediaroomNotify(object):
             return self._device
         return GEN_ID_FORMAT.format(self.src_ip)
 
-def create_socket():
+def create_socket(local_hostname):
     # Create multicast socket
     addrinfo = socket.getaddrinfo(MEDIAROOM_BROADCAST_ADDR, None)[0]
     sock = socket.socket(addrinfo[0], socket.SOCK_DGRAM)
@@ -133,11 +133,12 @@ def create_socket():
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
     # IGMP packet
+    local_ip = socket.gethostbyname(local_hostname)
     group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
     #mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
-    mreq = socket.inet_aton(MEDIAROOM_BROADCAST_ADDR) + socket.inet_aton("192.168.1.40")
+    mreq = socket.inet_aton(MEDIAROOM_BROADCAST_ADDR) + socket.inet_aton(local_ip)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton("192.168.1.40"))
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(local_ip)
 
     sock.bind(('', MEDIAROOM_BROADCAST_PORT))
 
@@ -183,16 +184,16 @@ class MediaroomProtocol(asyncio.DatagramProtocol):
         _LOGGER.debug("Closing MediaroomProtocol")
         self.transport.close()
 
-async def install_mediaroom_protocol(responses_callback, box_ip=None):
+async def install_mediaroom_protocol(responses_callback, local_hostname=None):
     """Install an asyncio protocol to process NOTIFY messages."""
     from . import version
     _LOGGER.debug(version)
 
     loop = asyncio.get_event_loop()
 
-    mediaroom_protocol = MediaroomProtocol(responses_callback, box_ip)
+    mediaroom_protocol = MediaroomProtocol(responses_callback, None)
 
-    sock = create_socket()
+    sock = create_socket(local_hostname)
 
     connect = loop.create_datagram_endpoint(lambda: mediaroom_protocol, sock=sock)
     transport, protocol = await loop.create_task(connect)
