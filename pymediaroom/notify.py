@@ -136,10 +136,10 @@ def create_socket(local_hostname):
     local_ip = socket.gethostbyname(local_hostname)
     group_bin = socket.inet_pton(addrinfo[0], addrinfo[4][0])
     #mreq = group_bin + struct.pack('=I', socket.INADDR_ANY)
-    mreq = socket.inet_aton(MEDIAROOM_BROADCAST_ADDR) + socket.inet_aton(local_ip)
+    mreq = socket.inet_aton(MEDIAROOM_BROADCAST_ADDR) + socket.inet_aton(local_ip))
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(local_ip)
-
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(local_ip))
+    
     sock.bind(('', MEDIAROOM_BROADCAST_PORT))
 
     return sock
